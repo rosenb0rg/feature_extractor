@@ -11,4 +11,5 @@ extractor.py uses dlib's facial recognition to locate and crop out a specificed 
 
 replacer.py takes a folder of cropped mouth images and recomposites them back into the region of the source images from which they were taken.
 
-    replacer.py -m [directory with cropped images and json file] -f [directory with original faces] -o [output directory]
+    replacer.py -m [directory with cropped images and json file] -f [directory with original faces \
+    -o [output directory]
