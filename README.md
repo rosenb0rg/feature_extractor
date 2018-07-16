@@ -1,11 +1,11 @@
 # feature_extractor
 Extract and re-composite individual facial features from a photograph
 
-I wrote this script to generate images of facial parts to supply to faceswap-GAN and Deepfakes to experiment with training specific facial regions (i.e. mouth only)
+I wrote this script to generate images of facial regions to supply to faceswap-GAN and Deepfakes to experiment with training specific facial regions (i.e. mouth only)
 
 There are two compononents:
 
-extractor.py uses dlib's facial recognition to locate and crop out specificed facial region as a 256x256 square in a folder of face images. It will also output a json file with the coordinates to realign the cropped image with the original file.
+extractor.py uses dlib's facial recognition to locate and crop out a specificed facial region. It outputs 256x256 jpegs along with a json file with the coordinates to realign the cropped images with their respective original files.
 
     extractor.py -i [input directory] -o [output directory]
 
