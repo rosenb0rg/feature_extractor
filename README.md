@@ -1,7 +1,7 @@
 # feature_extractor
 Extract and re-composite individual facial features from a photograph
 
-I wrote this script to generate images of facial regions to supply to faceswap-GAN and Deepfakes to experiment with training specific facial regions (i.e. mouth only)
+I wrote this script to generate images of facial regions to supply to Faceswap-GAN and DeepFakes to experiment with training specific facial regions (i.e. mouth only).
 
 There are two compononents:
 
