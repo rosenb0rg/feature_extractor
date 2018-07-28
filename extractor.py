@@ -10,6 +10,8 @@ from collections import OrderedDict
 import json
 import glob
 import os
+from math import atan2, degrees
+import math
 
 
 # Facial Landmarks dictionary
@@ -25,6 +27,8 @@ FACIAL_LANDMARKS_IDXS = OrderedDict([
 
 # define the area of the face to extract
 face_part = "mouth"
+
+#align_points = (48, 54)
 
 def rect_to_bb(rect):
 	# take a bounding predicted by dlib and convert it
@@ -50,11 +54,48 @@ def shape_to_np(shape, dtype="int"):
 	# return the list of (x, y)-coordinates
 	return coords
 
+def rotate_image(mat, angle):
+    """
+    Rotates an image (angle in degrees) and expands image to avoid cropping
+    """
+    height, width, color = mat.shape
+    image_center = (width/2, height/2) # getRotationMatrix2D needs coordinates in reverse order (width, height) compared to shape
+    rotation_mat = cv2.getRotationMatrix2D(image_center, angle, 1.)
+
+    # rotation calculates the cos and sin, taking absolutes of those.
+    abs_cos = abs(rotation_mat[0,0]) 
+    abs_sin = abs(rotation_mat[0,1])
+
+    # find the new width and height bounds
+    bound_w = int(height * abs_sin + width * abs_cos)
+    bound_h = int(height * abs_cos + width * abs_sin)
+
+    # subtract old image center (bringing image back to origo) and adding the new image center coordinates
+    rotation_mat[0, 2] += bound_w/2 - image_center[0]
+    rotation_mat[1, 2] += bound_h/2 - image_center[1]
+
+    # rotate image with the new bounds and translated rotation matrix
+    rotated_mat = cv2.warpAffine(mat, rotation_mat, (bound_w, bound_h))
+    return rotated_mat
+
+def rotate(origin, point, angle):
+    """
+    Rotate a point counterclockwise by a given angle around a given origin.
+
+    The angle should be given in radians.
+    """
+    ox, oy = origin
+    px, py = point
+
+    qx = ox + math.cos(angle) * (px - ox) - math.sin(angle) * (py - oy)
+    qy = oy + math.sin(angle) * (px - ox) + math.cos(angle) * (py - oy)
+    return qx, qy
+
 # construct the argument parser and parse the arguments
 parser = argparse.ArgumentParser(description='extractor!!!')
-parser.add_argument("-i", "--iDir", type=str, required=True,
+parser.add_argument("-i", "--iDir", type=str, required=False, default='in',
 	help="input directory")
-parser.add_argument("-o", "--oDir", type=str, required=True,
+parser.add_argument("-o", "--oDir", type=str, required=False, default='out',
 	help="output directory")
 args = parser.parse_args()
  
@@ -80,7 +121,7 @@ for file in glob.glob('%s/*.jpg' % in_dir):
 # to be written to a json file for the replacer script on the other side
 info_dict = {}
 
-# walk the list if input images, detect images
+# walk the list of input images, detect images
 for i, image_path in enumerate(image_path_list):
 
 	# load the input image, and convert it to grayscale (dont resize)
@@ -89,28 +130,51 @@ for i, image_path in enumerate(image_path_list):
 	 
 	# detect faces in the grayscale image
 	rects = detector(gray, 1)
-
 	# loop over the face detections
 	for (i, rect) in enumerate(rects):
+		# identifier for Nth face in an image
+		id = i
+
 		# determine the facial landmarks for the face region, then
 		# convert the landmark (x, y)-coordinates to a NumPy array
 		shape = predictor(gray, rect)
 		shape = shape_to_np(shape)
+		
+		# determine rotation angle needed to align mouth
+		left_m = shape[48]
+		right_m = shape[54]
+		deltx = right_m[0]-left_m[0]
+		delty = right_m[1]-left_m[1]
+		theta_radians = atan2(delty, deltx)
+		degrees = math.degrees(theta_radians)
+
+		# rotate original image to align
+		image_r = rotate_image(image , degrees)
+		# filename = os.path.basename(image_path)
+		# out_path='%s/rotated_%s_%s' % (out_dir, i, os.path.basename(image_path))
+		# cv2.imwrite(out_path, image_r)
+
+		# detect facial landmarks in rotated image
+		gray = cv2.cvtColor(image_r, cv2.COLOR_BGR2GRAY) 
+		rects = detector(gray, 1)
+		shape = predictor(gray, rect)
+		shape = shape_to_np(shape)
 
 		#just looking at the mouth region (i.e. points 48 to 68)
-		i = FACIAL_LANDMARKS_IDXS[face_part][0]
-		j = FACIAL_LANDMARKS_IDXS[face_part][1]
+		q = FACIAL_LANDMARKS_IDXS[face_part][0]
+		t = FACIAL_LANDMARKS_IDXS[face_part][1]
+		# print ('q', q, 't', t)
 
 		# extract the ROI of the face region as a separate image
 		# make it a square based on widht of the mouth
-		(x, y, w, h) = cv2.boundingRect(np.array([shape[i:j]]))
+		(x, y, w, h) = cv2.boundingRect(np.array([shape[q:t]]))
 		boop = (w-h)/2
 		# make the box around the mouth a square
 		y = y - boop
 		h = w
 
 		# pixels of padding as a percentage of the width
-		pad = int(round(.5*w))
+		pad = int(round(.25*w))
 
 		x-=pad
 		x=int(x)
@@ -121,21 +185,28 @@ for i, image_path in enumerate(image_path_list):
 		w+=2*pad
 		w=int(w)
 
-		coords =[x,y,h,w]
+		coords = [x,y,h,w]
+
+		#basename for files
 		filename = os.path.basename(image_path)
-		out_path='%s/crop_%s' % (out_dir,os.path.basename(image_path))
 
-		#add filenae, coordinates and outputh to dictionary
-		info_dict['%s' % filename] = coords, out_path
+		# location of the cropped face and source image
+		out_path = '%s/crop_%s_%s' % (out_dir, id, filename)
+		in_path = '%s/%s' % (in_dir, filename)
 
-		# add padding and resize to 256 pixels
-		roi = image[y:y + h,x:x + w]
-		roi = imutils.resize(roi, 256, inter=cv2.INTER_CUBIC)
+		# add cropped output file path, coordinates and input 
+		# file path to dictionary
+		info_dict['%s' % (out_path)] = coords, degrees, in_path
+
+		# add padding and resize to 128 pixels
+		roi = image_r[y:y + h,x:x + w]
+		roi = imutils.resize(roi, 128, inter=cv2.INTER_CUBIC)
 
 		# write image
 		cv2.imwrite(out_path, roi)
-		cv2.waitKey(0)
 
-
-with open('%s/alignments.json' % out_dir, 'w') as outfile:
-   	json.dump(info_dict, outfile)
+try:
+	with open('%s/alignments.json' % out_dir, 'w') as outfile:
+		json.dump(info_dict, outfile)
+except:
+	pass
