@@ -140,6 +140,7 @@ for i, image_path in enumerate(image_path_list):
 
 try:
 	with open('%s/alignments.json' % out_dir, 'w') as outfile:
-		json.dump(info_dict, outfile)
+		json.dump(info_dict, outfile, indent=4)
+		outfile.write("\n")
 except:
 	pass
