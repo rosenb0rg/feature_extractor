@@ -88,9 +88,10 @@ for i, image_path in enumerate(image_path_list):
 		# image_center = get_img_center(image_r)
 
 		# detect facial landmarks in rotated image
+		# needs to be edited to work on multi-face images
 		gray = cv2.cvtColor(image_r, cv2.COLOR_BGR2GRAY) 
 		rects = detector(gray, 1)
-		shape = predictor(gray, rect)
+		shape = predictor(gray, rects[0])
 		shape = shape_to_np(shape)
 
 		#just looking at the mouth region (i.e. points 48 to 68)
@@ -118,7 +119,7 @@ for i, image_path in enumerate(image_path_list):
 		h = w
 
 		# pixels of padding as a percentage of the width
-		pad = int(round(.25*w))
+		pad = int(round(.5*w))
 
 		x-=pad
 		x=int(x)
