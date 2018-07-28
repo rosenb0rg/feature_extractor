@@ -46,12 +46,13 @@ predictor = dlib.shape_predictor("./shape_predictor_68_face_landmarks.dat")
 in_dir = args.iDir
 out_dir = args.oDir
 
+extensions = ['.png', '.jpg', '.jpeg']
+
 image_path_list = []
 # create a list of all the PNG or JPG images in the input directory
-for file in glob.glob('%s/*.png' % in_dir):
-	image_path_list.append(file)
-for file in glob.glob('%s/*.jpg' % in_dir):
-	image_path_list.append(file)
+for extension in extensions:
+	for file in glob.glob('%s/*%s' % (in_dir, extension)):
+		image_path_list.append(file)
 
 # create an empty dictionary for filename, coordinate info
 # to be written to a json file for the replacer script on the other side
