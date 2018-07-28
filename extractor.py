@@ -7,9 +7,9 @@ from collections import OrderedDict
 import json
 import glob
 import os
-from math import atan2, degrees
+from math import atan2, degrees, radians
 import math
-from utils import rect_to_bb, shape_to_np, rotate_image, rotate
+from utils import *
 
 
 # facial Landmarks dictionary
@@ -77,15 +77,14 @@ for i, image_path in enumerate(image_path_list):
 		shape = shape_to_np(shape)
 		
 		# determine rotation angle needed to align mouth
-		left_m = shape[48]
-		right_m = shape[54]
-		deltx = right_m[0]-left_m[0]
-		delty = right_m[1]-left_m[1]
-		theta_radians = atan2(delty, deltx)
-		degrees = math.degrees(theta_radians)
+		degrees = get_rot_angle(shape[48], shape[54])
 
 		# rotate original image to align
 		image_r = rotate_image(image , degrees)
+
+		# # eventually: get the center of the enlarged, rotated image
+		# # to realign the x,y corner pointer for cropping (bypass second face detection)
+		# image_center = get_img_center(image_r)
 
 		# detect facial landmarks in rotated image
 		gray = cv2.cvtColor(image_r, cv2.COLOR_BGR2GRAY) 
@@ -101,6 +100,17 @@ for i, image_path in enumerate(image_path_list):
 		# extract the ROI of the face region as a separate image
 		# make it a square based on widht of the mouth
 		(x, y, w, h) = cv2.boundingRect(np.array([shape[q:t]]))
+		
+
+		# # eventually: rotate x,y points around the image center to reorient ROI box
+		# point = [x,y]
+		# x,y = rotate(image_center, point, math.radians(degrees))
+
+		# print ('point', point)
+		# print ('degrees', degrees)
+		# print ('rotated point', x, y)
+
+
 		boop = (w-h)/2
 		# make the box around the mouth a square
 		y = y - boop

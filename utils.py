@@ -1,5 +1,8 @@
 import numpy as np
 import cv2
+import math
+from math import atan2, degrees
+
 
 
 def rect_to_bb(rect):
@@ -25,6 +28,18 @@ def shape_to_np(shape, dtype="int"):
  
 	# return the list of (x, y)-coordinates
 	return coords
+
+def get_rot_angle(point1, point2):     
+    deltx = point2[0]-point1[0]
+    delty = point2[1]-point1[1]
+    theta_radians = atan2(delty, deltx)
+    degrees = math.degrees(theta_radians)
+    return degrees
+
+def get_img_center(mat):
+    height, width, color = mat.shape
+    image_center = (width/2, height/2) 
+    return image_center
 
 def rotate_image(mat, angle):
     """
