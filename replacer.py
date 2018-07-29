@@ -34,17 +34,19 @@ out_dir = args.compDir
 with open("%s/alignments.json" % mouth_dir) as handle:
     info_dict = json.loads(handle.read())
 
-# for key in info_dict:
-# 	mouth_path_list.append(key)
+
 
 # print (mouth_path_list)
 
 mouth_path_list = []
 
-for file in glob.glob('%s/*.png' % mouth_dir):
-	mouth_path_list.append(file)
-for file in glob.glob('%s/*.jpg' % mouth_dir):
-	mouth_path_list.append(file)
+for key in info_dict:
+	mouth_path_list.append(key)
+
+# for file in glob.glob('%s/*.png' % mouth_dir):
+# 	mouth_path_list.append(file)
+# for file in glob.glob('%s/*.jpg' % mouth_dir):
+# 	mouth_path_list.append(file)
 
 
 # walk the list if cropped mouth images, detect images

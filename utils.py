@@ -30,8 +30,8 @@ def shape_to_np(shape, dtype="int"):
 	return coords
 
 def get_rot_angle(point1, point2):     
-    deltx = point2[0]-point1[0]
-    delty = point2[1]-point1[1]
+    deltx = point2[0]-point1[0] # x2 - x1
+    delty = point2[1]-point1[1] # y2 - y1
     theta_radians = atan2(delty, deltx)
     degrees = math.degrees(theta_radians)
     return degrees
