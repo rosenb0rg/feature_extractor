@@ -43,14 +43,14 @@ target_number = args.Targ
 
 character_info = Character(character_name, scene_name, source_number, target_number)
 
-mouth_dir = character_info.align_conv_dir()
-out_dir = character_info.align_comped_dir()
-alignemnts_dir = character_info.align_crop_dir()
+mouth_dir = character_info.align_conv_dir
+out_dir = character_info.align_comped_dir
+alignemnts_dir = character_info.align_crop_dir
 
 print(mouth_dir, out_dir, alignemnts_dir)
 
 #load alignments file
-with open("%s/alignments.json" % alignemnts_dir) as handle:
+with open("%s\\alignments.json" % alignemnts_dir) as handle:
     info_dict = json.loads(handle.read())
 
 

@@ -42,6 +42,8 @@ parser.add_argument("-S", "--Src", type=str, required=False, default='in',
 	help="source number")
 parser.add_argument("-t", "--Targ", type=str, required=False, default='out',
 	help="target number")
+parser.add_argument("-m", "--Mode", type=int, required=False, default=0,
+	help="mode 0 runs normally, mode 1 will crop faces for training given a character only")
 args = parser.parse_args()
  
 # initialize dlib's face detector (HOG-based) and then create
@@ -56,10 +58,18 @@ scene_name = args.Sce
 character_name = args.Char
 source_number = args.Src
 target_number = args.Targ
+mode_num = args.Mode
 
-character_info = Character(character_name, scene_name, source_number, target_number)
-in_dir = character_info.align_png_dir()
-out_dir = character_info.align_crop_dir()
+
+
+if mode_num == 0:
+	character_info = Character(character_name, scene_name, source_number, target_number)
+	in_dir = character_info.align_png_dir
+	out_dir = character_info.align_crop_dir
+else:
+	character_info = Character(character_name, scene="00", source=00, target=00)
+	in_dir = character_info.imgB_dir
+	out_dir = character_info.imgB_crop_dir
 
 if not os.path.exists(in_dir):
 	os.makedirs(in_dir)
