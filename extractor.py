@@ -10,6 +10,7 @@ import os
 from math import atan2, degrees, radians
 import math
 from utils import *
+from char_dir import *
 
 # facial Landmarks dictionary
 FACIAL_LANDMARKS_IDXS = OrderedDict([
@@ -28,10 +29,19 @@ face_part = "mouth"
 # construct the argument parser and parse the arguments
 parser = argparse.ArgumentParser(description='extractor!!!')
 
-parser.add_argument("-i", "--iDir", type=str, required=False, default='in',
-	help="input directory")
-parser.add_argument("-o", "--oDir", type=str, required=False, default='out',
-	help="output directory")
+# parser.add_argument("-i", "--iDir", type=str, required=False, default='in',
+# 	help="input directory")
+# parser.add_argument("-o", "--oDir", type=str, required=False, default='out',
+# 	help="output directory")
+
+parser.add_argument("-s", "--Sce", type=str, required=False, default='in',
+	help="scene name")
+parser.add_argument("-c", "--Char", type=str, required=False, default='out',
+	help="character name")
+parser.add_argument("-S", "--Src", type=str, required=False, default='in',
+	help="source number")
+parser.add_argument("-t", "--Targ", type=str, required=False, default='out',
+	help="target number")
 args = parser.parse_args()
  
 # initialize dlib's face detector (HOG-based) and then create
@@ -42,8 +52,25 @@ detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor("C:/local/src/feature_extractor/shape_predictor_68_face_landmarks.dat")
 
 #input and output directories
-in_dir = args.iDir
-out_dir = args.oDir
+scene_name = args.Sce
+character_name = args.Char
+source_number = args.Src
+target_number = args.Targ
+
+character_info = Character(character_name, scene_name, source_number, target_number)
+in_dir = character_info.align_png_dir()
+out_dir = character_info.align_crop_dir()
+
+if not os.path.exists(in_dir):
+	os.makedirs(in_dir)
+
+if not os.path.exists(out_dir):
+	os.makedirs(out_dir)
+
+print (in_dir, out_dir)
+
+# in_dir = args.iDir
+# out_dir = args.oDir
 
 extensions = ['.png', '.jpg', '.jpeg']
 
