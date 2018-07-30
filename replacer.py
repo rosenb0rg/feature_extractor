@@ -9,9 +9,9 @@ import dlib
 import cv2
 from collections import OrderedDict
 import json
+import os
 from os import walk
 import glob
-import os
 from utils import rect_to_bb, shape_to_np, rotate_image, rotate
 
 # construct the argument parser and parse the arguments
@@ -35,28 +35,29 @@ with open("%s/alignments.json" % mouth_dir) as handle:
     info_dict = json.loads(handle.read())
 
 
-
 # print (mouth_path_list)
 
 mouth_path_list = []
 
-for key in info_dict:
-	mouth_path_list.append(key)
+# for key in info_dict:
+# 	mouth_path_list.append(key)
 
-# for file in glob.glob('%s/*.png' % mouth_dir):
-# 	mouth_path_list.append(file)
-# for file in glob.glob('%s/*.jpg' % mouth_dir):
-# 	mouth_path_list.append(file)
+for file in glob.glob('%s/*.png' % mouth_dir):
+	mouth_path_list.append(file)
+for file in glob.glob('%s/*.jpg' % mouth_dir):
+	mouth_path_list.append(file)
+	print (mouth_path_list)
 
 
 # walk the list if cropped mouth images, detect images
 for i, mouth_path in enumerate(mouth_path_list):
+	mouth_path_base = os.path.basename(mouth_path)
 	print (mouth_path)
 	#print ('%s/%s' % (face_dir, os.path.basename(mouth_path)))
 
-	coords = info_dict[(mouth_path)][0]
-	degrees = info_dict[(mouth_path)][1]
-	face_path = info_dict[(mouth_path)][2]
+	coords = info_dict[(mouth_path_base)][0]
+	degrees = info_dict[(mouth_path_base)][1]
+	face_path = info_dict[(mouth_path_base)][2]
 	x,y,h,w = coords
 
 	mouth_img = cv2.imread(mouth_path)

@@ -39,7 +39,7 @@ args = parser.parse_args()
 detector = dlib.get_frontal_face_detector()
 
 # path for the shape predictor
-predictor = dlib.shape_predictor("./shape_predictor_68_face_landmarks.dat")
+predictor = dlib.shape_predictor("C:/local/src/feature_extractor/shape_predictor_68_face_landmarks.dat")
 
 #input and output directories
 in_dir = args.iDir
@@ -144,7 +144,7 @@ for i, image_path in enumerate(image_path_list):
 
 			# add cropped output file path, coordinates and input 
 			# file path to dictionary
-			info_dict['%s' % (out_path)] = coords, degrees, in_path
+			info_dict[filename] = coords, degrees, in_path
 
 			# add padding and resize to 128 pixels
 			roi = image_r[y:y + h,x:x + w]
