@@ -9,6 +9,7 @@ import glob
 import os
 from math import atan2, degrees, radians
 import math
+from tqdm import tqdm
 from utils import *
 from char_dir import *
 
@@ -93,7 +94,7 @@ for extension in extensions:
 # to be written to a json file for the replacer script on the other side
 info_dict = {}
 # walk the list of input images, detect images
-for i, image_path in enumerate(image_path_list):
+for i, image_path in tqdm(enumerate(image_path_list)):
 	try:
 
 	# load the input image, and convert it to grayscale (dont resize)

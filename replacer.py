@@ -49,6 +49,9 @@ alignemnts_dir = character_info.align_crop_dir
 
 print(mouth_dir, out_dir, alignemnts_dir)
 
+if not os.path.exists(out_dir):
+	os.makedirs(out_dir)
+
 #load alignments file
 with open("%s\\alignments.json" % alignemnts_dir) as handle:
     info_dict = json.loads(handle.read())
