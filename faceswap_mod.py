@@ -54,11 +54,14 @@ import sys
 from glob import glob
 from os import walk
 import glob
+from tqdm import tqdm
 from char_dir import *
+import shutil
+from mtcnn.mtcnn import MTCNN
 
 
 PREDICTOR_PATH = "C:/local/src/PRnet/shape_predictor_68_face_landmarks.dat"
-SCALE_FACTOR = 1 
+SCALE_FACTOR = 1
 FEATHER_AMOUNT = 5
 
 FACE_POINTS = list(range(17, 68))
@@ -71,15 +74,15 @@ NOSE_POINTS = list(range(27, 35))
 JAW_POINTS = list(range(0, 17))
 
 # Points used to line up the images.  
-ALIGN_POINTS = (NOSE_POINTS + MOUTH_POINTS + FACE_POINTS + RIGHT_EYE_POINTS + LEFT_EYE_POINTS + JAW_POINTS)
+#ALIGN_POINTS = (MOUTH_POINTS + NOSE_POINTS + RIGHT_EYE_POINTS + LEFT_EYE_POINTS)
 
-#ALIGN_POINTS = (FACE_POINTS + RIGHT_BROW_POINTS + RIGHT_EYE_POINTS + LEFT_BROW_POINTS + LEFT_EYE_POINTS + NOSE_POINTS + MOUTH_POINTS + JAW_POINTS)
+# All
+ALIGN_POINTS = (FACE_POINTS + RIGHT_BROW_POINTS + RIGHT_EYE_POINTS + LEFT_BROW_POINTS + LEFT_EYE_POINTS + NOSE_POINTS + MOUTH_POINTS)
 #ALIGN_POINTS = (RIGHT_BROW_POINTS + RIGHT_EYE_POINTS + LEFT_BROW_POINTS + LEFT_EYE_POINTS + NOSE_POINTS + MOUTH_POINTS)
 #ALIGN_POINTS = (MOUTH_POINTS)
 
 # Points from the second image to overlay on the first. The convex hull of each
 # element will be overlaid.
-#    
 
 OVERLAY_POINTS = [
     LEFT_EYE_POINTS + RIGHT_EYE_POINTS + LEFT_BROW_POINTS + RIGHT_BROW_POINTS,
@@ -91,6 +94,7 @@ OVERLAY_POINTS = [
 COLOUR_CORRECT_BLUR_FRAC = 1
 
 detector = dlib.get_frontal_face_detector()
+# detectorb = MTCNN()
 predictor = dlib.shape_predictor(PREDICTOR_PATH)
 
 class TooManyFaces(Exception):
@@ -179,12 +183,12 @@ def transformation_from_points(points1, points2):
                                        c2.T - (s2 / s1) * R * c1.T)),
                          numpy.matrix([0., 0., 1.])])
 
-def read_im_and_landmarks(fname):
-    im = cv2.imread(fname, cv2.IMREAD_COLOR)
+def read_im_and_landmarks(image):
+    # im = cv2.imread(fname, cv2.IMREAD_COLOR)
+    im = image
     im = cv2.resize(im, (im.shape[1] * SCALE_FACTOR,
                          im.shape[0] * SCALE_FACTOR))
     s = get_landmarks(im)
-
     return im, s
 
 def warp_im(im, M, dshape):
@@ -233,84 +237,92 @@ def correct_colours(im1, im2, landmarks1):
 
 
 def main(args):
-
-    # head_folder = args.headDir
-    # face_folder = args.faceDir
-    # out_folder = args.outDir
-    # print (head_folder)
-    # print (face_folder)
-    # print (out_folder)
-
-    # baseDir = args.baseDir
-    # character = args.character
-    # scene = args.scene
-    # source = args.source
-    # target = args.target
-
+    # assign command line arguments to variables
     scene_name = args.scene
     character_name = args.character
     source_number = args.source
     target_number = args.target
 
+    # get character info from arguments
     character_info = Character(character_name, scene_name, source_number, target_number)
 
-
+    # assign input and output directories
     head_folder = character_info.swap_head_dir
     face_folder = character_info.align_comped_dir
     save_folder = character_info.swap_comp_dir
+    print ('\nhead folder', head_folder, '\nface folder:', face_folder, '\nsave_folder:', save_folder)
 
-
-    in_dir = character_info.align_png_dir
-    out_dir = character_info.align_crop_dir
-
-	# # something like d:\characters\raupach\face\raupach_t03b
- #    head_folder = "%s\\%s\\face\\%s_t%s" % (baseDir, character,  character, target)
- #    print ('head folder', head_folder)
-
- #    # something like d:\characters\raupach\raupach_src\align\raupach_raupach_s001_t03b\comped
- #    face_folder = "%s\\%s\\src\\align\\%s_%s_s%s_t%s\\comped" % (baseDir, character, scene, character, source, target)
- #    print ('face folder', face_folder)
-
- #    # something like d:\characters\raupach\src\comp\raupach_raupach_s001_tp1
- #    save_folder = "%s\\%s\\src\\comp\\%s_%s_s%s_t%s" % (baseDir, character, scene, character, source, target)
- #    print ('save folder', save_folder)
+    # make sure there is a place to save the output!
+    # if os.path.exists(save_folder):
+    #     shutil.rmtree(save_folder, ignore_errors=True)
+    #     os.makedirs(save_folder)
 
     if not os.path.exists(save_folder):
-        os.mkdir(save_folder)
+        os.makedirs(save_folder)
 
+    # make an ordered list of all the target head files
     head_path_list = []
     for file in glob.glob("%s\\*.png" % head_folder):
         head_path_list.append(file)
-
+    for file in glob.glob("%s\\*.jpg" % head_folder):
+        head_path_list.append(file)
     head_path_list=sorted(head_path_list)
     #print (head_path_list)
 
+    # make an ordered list of all the faces to composite
     face_path_list = []
     for file in glob.glob("%s\\*.png" % face_folder):
         face_path_list.append(file)
-
+    for file in glob.glob("%s\\*.jpg" % face_folder):
+        face_path_list.append(file)
     face_path_list=sorted(face_path_list)
     # print (face_path_list)
+    b = len(face_path_list)
 
-    for i, image_path in enumerate(head_path_list):
-        try:
-            print (i)
-            head = head_path_list[i]
-            #print (head)
-            face = face_path_list[i]    
-            #print (face)
-            im1, landmarks1 = read_im_and_landmarks(head)
-            im2, landmarks2 = read_im_and_landmarks(face)
-            M = transformation_from_points(landmarks1[ALIGN_POINTS], landmarks2[ALIGN_POINTS])
-            mask = get_face_mask(im2, landmarks2)
-            warped_mask = warp_im(mask, M, im1.shape)
-            combined_mask = numpy.max([get_face_mask(im1, landmarks1), warped_mask], axis=0)
-            warped_im2 = warp_im(im2, M, im1.shape)
-            warped_corrected_im2 = correct_colours(im1, warped_im2, landmarks1)
-            output_im = im1 * (1.0 - combined_mask) + warped_corrected_im2 * combined_mask
-            cv2.imwrite('%s/%s' % (save_folder, os.path.basename(face)), output_im)
-    
-        except:
+    for i, image_path in tqdm(enumerate(head_path_list)):
+        if i<b:
+            try:
+                print (i)
+                head_file = head_path_list[i]
+                face_file = face_path_list[i]
+                head_base = (head_file.split('\\')[-1:][0]).strip()
+                face_base = (face_file.split('\\')[-1:][0]).strip()
+                print ('\nhead:', head_file,'\nface:', face_file,'\n')
+
+                # read the image files for opencv
+                head_img = cv2.imread(head_file, cv2.IMREAD_COLOR)
+                face_img = cv2.imread(face_file, cv2.IMREAD_COLOR)
+
+                # use MTCNN to pre-crop face                
+                # result = detectorb.detect_faces(face_img)
+                # print (result)
+                # face_box = result[0]['box']
+                # fx, fy, fw, fh = face_box
+                # print (fy, fy+fh, fx, fx+fw)
+                # pad = .1*fh
+                # pad = int(pad/2)
+                # print ('pad', pad)
+                # fy -= pad
+                # fh += 2*pad
+                # print (fy, fy+fh, fx, fx+fw)
+                # face_img = face_img[fy:fy+fh, fx:fx+fw]
+
+                # perform the transformation 
+                im1, landmarks1 = read_im_and_landmarks(head_img)
+                im2, landmarks2 = read_im_and_landmarks(face_img)
+                M = transformation_from_points(landmarks1[ALIGN_POINTS], landmarks2[ALIGN_POINTS])
+                mask = get_face_mask(im2, landmarks2)
+                warped_mask = warp_im(mask, M, im1.shape)
+                combined_mask = numpy.max([get_face_mask(im1, landmarks1), warped_mask], axis=0)
+                warped_im2 = warp_im(im2, M, im1.shape)
+                warped_corrected_im2 = correct_colours(im1, warped_im2, landmarks1)
+                output_im = im1 * (1.0 - combined_mask) + warped_corrected_im2 * combined_mask
+                # uncomment for no color correction at all
+                # output_im = im1 * (1.0 - combined_mask) + warped_im2 * combined_mask
+                cv2.imwrite('%s/%s' % (save_folder, face_base), output_im)
+            except Exception as e:
+                print('exception', e)
+        else:
             pass
 
 if __name__ == '__main__':

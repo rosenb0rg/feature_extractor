@@ -10,8 +10,11 @@ import os
 from math import atan2, degrees, radians
 import math
 from tqdm import tqdm
+import shutil
 from utils import *
 from char_dir import *
+import shutil
+from mtcnn.mtcnn import MTCNN
 
 # facial Landmarks dictionary
 FACIAL_LANDMARKS_IDXS = OrderedDict([
@@ -49,10 +52,11 @@ args = parser.parse_args()
  
 # initialize dlib's face detector (HOG-based) and then create
 # the facial landmark predictor
-detector = dlib.get_frontal_face_detector()
+#detector = dlib.get_frontal_face_detector()
+
 
 # path for the shape predictor
-predictor = dlib.shape_predictor("C:/local/src/feature_extractor/shape_predictor_68_face_landmarks.dat")
+#predictor = dlib.shape_predictor("C:/local/src/feature_extractor/shape_predictor_68_face_landmarks.dat")
 
 #input and output directories
 scene_name = args.Sce
@@ -72,13 +76,19 @@ else:
 	in_dir = character_info.imgB_dir
 	out_dir = character_info.imgB_crop_dir
 
+if os.path.exists(out_dir):
+	shutil.rmtree(out_dir, ignore_errors=True)
+	os.makedirs(out_dir)
+
 if not os.path.exists(in_dir):
 	os.makedirs(in_dir)
 
 if not os.path.exists(out_dir):
 	os.makedirs(out_dir)
 
-print (in_dir, out_dir)
+save_name = character_info.full_name
+
+print (in_dir, '\n', out_dir)
 
 # in_dir = args.iDir
 # out_dir = args.oDir
@@ -86,113 +96,111 @@ print (in_dir, out_dir)
 extensions = ['.png', '.jpg', '.jpeg']
 
 image_path_list = []
+# 00100.png
 # create a list of all the PNG or JPG images in the input directory
+# if file lengh is less than 10 (i.e. hasnt been renamed), then give it a new name w/ correct format
+# (renaming function turned off for now - not useful anymore)
 for extension in extensions:
-	for file in glob.glob('%s/*%s' % (in_dir, extension)):
+	for i, file in enumerate(glob.glob('%s/*%s' % (in_dir, extension))):
+		head, tail = os.path.split(file)
+		print (head, tail)
+		img_num = '{0:03d}'.format(i+1)
+		#print (img_num)
+		renamed = head + '\\' + save_name + '_' + img_num + extension
+		#print ('file:', file, "\n")
+		print ('renamed', renamed, '\n')
+		shutil.move(file, renamed)
+		#image_path_list.append(renamed)
+
+for extension in extensions:
+	for i, file in enumerate(glob.glob('%s/*%s' % (in_dir, extension))):
 		image_path_list.append(file)
+
+image_path_list = sorted(image_path_list)
+
+print (image_path_list)
+
 # create an empty dictionary for filename, coordinate info
 # to be written to a json file for the replacer script on the other side
 info_dict = {}
-# walk the list of input images, detect images
-for i, image_path in tqdm(enumerate(image_path_list)):
-	try:
 
-	# load the input image, and convert it to grayscale (dont resize)
-		image = cv2.imread(str(image_path))
-		gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-	 
-	# detect faces in the grayscale image
-		rects = detector(gray, 1)
+# walk the list of input images, detect images
+detector = MTCNN()
+
+for i, image_path in enumerate(image_path_list):
+	try:
+		# load image and crop out the face with some padding
+		image = cv2.imread(str(image_path))	
+		results = detector.detect_faces(image)[0]
+		#print (results['box'])
+		x, y, w, h = results['box'] 
+
+		pad = int(.2*h)
+		x -= pad
+		w += 2*pad
+		y -= pad
+		h += 2*pad
+
+		image = image[y:y+h, x:x+w]
+		
+		# write over the exiting image with the cropped one
+		cv2.imwrite(image_path, image)
+
+		# redetect mouth points to extract just the mouth
+		mleft = detector.detect_faces(image)[0]['keypoints']['mouth_left']
+		mright = detector.detect_faces(image)[0]['keypoints']['mouth_right']
+		print (image_path)
+
+		# determine degrees needed to rotate the image to be aligned
+		degrees = get_rot_angle(mleft, mright)
+
+		# rotate original image to align
+		image_r = rotate_image(image, degrees)
+
+		# detect new mouth points (could replace with math)
+		mleft = detector.detect_faces(image_r)[0]['keypoints']['mouth_left']
+		mright = detector.detect_faces(image_r)[0]['keypoints']['mouth_right']
+
+		# create coordinates for bounding box
+		w = mright[0] - mleft[0]
+		h = w
+		x = mleft[0]
+		y = mleft[1] - h/2
+		print (x, y, w, h)
+
+		# add pixels of padding as a percentage of the width
+		pad = int(round(.5*w))
+		x-=pad
+		x=int(x)
+		y-=pad
+		y=int(y)
+		h+=2*pad
+		h=int(h)
+		w+=2*pad
+		w=int(w)
+
+		coords = [x,y,h,w]
+
+		#basename for files
+		filename = os.path.basename(image_path)
+
+		# location of the cropped face and source image
+		out_path = '%s/%s' % (out_dir, filename)
+		in_path = '%s/%s' % (in_dir, filename)
+
+		# add cropped output file path, coordinates and input 
+		# file path to dictionary
+		info_dict[filename] = coords, degrees, in_path
+
+		# add padding and resize to 128 pixels
+		roi = image_r[y:y + h,x:x + w]
+		roi = cv2.resize(roi, (128,128))
+		#roi = imutils.resize(roi, 128, inter=cv2.INTER_CUBIC)
+
+		# write image
+		cv2.imwrite(out_path, roi)
 	except:
 		pass
-		
-	# loop over the face detections
-	for (i, rect) in enumerate(rects):
-		try:
-			# identifier for Nth face in an image
-			id = i
-
-			# determine the facial landmarks for the face region, then
-			# convert the landmark (x, y)-coordinates to a NumPy array
-			shape = predictor(gray, rect)
-			shape = shape_to_np(shape)
-			
-			# determine rotation angle needed to align mouth
-			degrees = get_rot_angle(shape[48], shape[54])
-
-			# rotate original image to align
-			image_r = rotate_image(image , degrees)
-
-			# # eventually: get the center of the enlarged, rotated image
-			# # to realign the x,y corner pointer for cropping (bypass second face detection)
-			# image_center = get_img_center(image_r)
-
-			# detect facial landmarks in rotated image
-			# needs to be edited to work on multi-face images
-			
-			gray = cv2.cvtColor(image_r, cv2.COLOR_BGR2GRAY) 
-			rects = detector(gray, 1)
-			shape = predictor(gray, rects[0])
-			shape = shape_to_np(shape)
-
-			#just looking at the mouth region (i.e. points 48 to 68)
-			q = FACIAL_LANDMARKS_IDXS[face_part][0]
-			t = FACIAL_LANDMARKS_IDXS[face_part][1]
-			# print ('q', q, 't', t)
-
-			# extract the ROI of the face region as a separate image
-			# make it a square based on widht of the mouth
-			(x, y, w, h) = cv2.boundingRect(np.array([shape[q:t]]))
-			
-
-			# # eventually: rotate x,y points around the image center to reorient ROI box
-			# point = [x,y]
-			# x,y = rotate(image_center, point, math.radians(degrees))
-
-			# print ('point', point)
-			# print ('degrees', degrees)
-			# print ('rotated point', x, y)
-
-
-			boop = (w-h)/2
-			# make the box around the mouth a square
-			y = y - boop
-			h = w
-
-			# pixels of padding as a percentage of the width
-			pad = int(round(.5*w))
-
-			x-=pad
-			x=int(x)
-			y-=pad
-			y=int(y)
-			h+=2*pad
-			h=int(h)
-			w+=2*pad
-			w=int(w)
-
-			coords = [x,y,h,w]
-
-			#basename for files
-			filename = os.path.basename(image_path)
-
-			# location of the cropped face and source image
-			out_path = '%s/%s' % (out_dir, filename)
-			in_path = '%s/%s' % (in_dir, filename)
-
-			# add cropped output file path, coordinates and input 
-			# file path to dictionary
-			info_dict[filename] = coords, degrees, in_path
-
-			# add padding and resize to 128 pixels
-			roi = image_r[y:y + h,x:x + w]
-			roi = cv2.resize(roi, (128,128))
-			#roi = imutils.resize(roi, 128, inter=cv2.INTER_CUBIC)
-
-			# write image
-			cv2.imwrite(out_path, roi)
-		except:
-			pass
 
 try:
 	with open('%s/alignments.json' % out_dir, 'w') as outfile:
